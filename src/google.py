@@ -3,19 +3,23 @@ import os
 from datetime import datetime
 from typing import List
 from urllib.parse import urlencode
+from flask import current_app
 
 import requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from tzlocal import get_localzone_name
 
-CLIENT_ID = '392712472664-gkqit9s9lent7621op0povgs4junkjae.apps.googleusercontent.com'
-CLIENT_SECRET = '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'
+# CLIENT_ID = '392712472664-gkqit9s9lent7621op0povgs4junkjae.apps.googleusercontent.com'
+# CLIENT_SECRET = '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'
 ACCESS_TOKEN_URI = 'https://www.googleapis.com/oauth2/v4/token'
-REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:5000")
+REDIRECT_URI = current_app.config.get("base_url", "http://localhost:5000")
 
 
 def get_google_token(code: str):
+	CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
+	CLIENT_SECRET = current_app.config['GOOGLE_CLIENT_SECRET']
+
 	access_token_req = {
 		"code": code,
 		"client_id": CLIENT_ID,
@@ -34,6 +38,10 @@ def get_google_token(code: str):
 def get_google_credential(access_token: str, refresh_token: str):
 	if not access_token:
 		return False
+
+	CLIENT_ID = current_app.config['GOOGLE_CLIENT_ID']
+	CLIENT_SECRET = current_app.config['GOOGLE_CLIENT_SECRET']
+
 	credentials = Credentials(
 		access_token,
 		token_uri=ACCESS_TOKEN_URI,
@@ -52,12 +60,24 @@ def get_google_profile(google_access_token: str):
 	return profile_info
 
 
-def get_google_calendar_color(credentials: Credentials, colorId: str):
+def get_google_calendar_event_colors(credentials: Credentials):
 	service = build('calendar', 'v3', credentials=credentials)
 	colors = service.colors().get().execute()
 	result = []
 	for id, color in colors['event'].items():
-		if id == colorId:
+		result.append({
+			id: color["background"]
+		})
+
+	return result
+
+
+def get_google_calendar_color(credentials: Credentials, color_id: str):
+	service = build('calendar', 'v3', credentials=credentials)
+	colors = service.colors().get().execute()
+	result = []
+	for id, color in colors['event'].items():
+		if id == color_id:
 			return color["background"]
 
 	return result
@@ -118,6 +138,34 @@ def add_google_calendar_event(credentials: Credentials, title: str, start_time: 
 		service = build('calendar', 'v3', credentials=credentials)
 
 		try:
-			service.events().insert(calendarId='primary', body=google_event).execute()
+			event = service.events().insert(calendarId='primary', body=google_event).execute()
+			return event['id']
+		except Exception as e:
+			print(e)
+
+
+def update_google_calendar_event(credentials: Credentials, event_id: str, title: str, start_time: datetime, end_time: datetime):
+	print("update google calendar event")
+
+	timezone_name = 'UTC'
+
+	if credentials:
+		service = build('calendar', 'v3', credentials=credentials)
+
+		try:
+			event = service.events().get(calendarId='primary', eventId=event_id.split('_')[0]).execute()
+
+			if event:
+				event["summary"] = title,
+				event['start'] = {
+					'dateTime': start_time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+					'timeZone': timezone_name,
+				}
+				event['end'] = {
+					'dateTime': end_time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+					'timeZone': timezone_name,
+				}
+
+				service.events().update(calendarId='primary', eventId=event['id'], body=event).execute()
 		except Exception as e:
 			print(e)
