@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS todos;
 DROP TABLE IF EXISTS conversation_history;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS users_lessons;
@@ -36,7 +37,7 @@ CREATE TABLE companies
 CREATE TABLE jobs
 (
 	id         INT         NOT NULL AUTO_INCREMENT,
-	company_id INT NULL,
+	company_id INT         NULL,
 	title      VARCHAR(50) NOT NULL,
 	level      INT         NOT NULL,
 	created_at DATETIME    NOT NULL,
@@ -50,7 +51,7 @@ CREATE TABLE teams
 	id         INT         NOT NULL AUTO_INCREMENT,
 	company_id INT         NOT NULL,
 	name       VARCHAR(25) NOT NULL,
-	mascot     TEXT NULL,
+	mascot     TEXT        NULL,
 	created_at DATETIME    NOT NULL,
 	updated_at DATETIME    NOT NULL,
 	PRIMARY KEY (id),
@@ -61,8 +62,8 @@ CREATE TABLE users
 (
 	id              INT          NOT NULL AUTO_INCREMENT,
 	company_id      INT          NOT NULL,
-	job_id          INT NULL,
-	team_id         INT NULL,
+	job_id          INT          NULL,
+	team_id         INT          NULL,
 	first_name      VARCHAR(255) NOT NULL,
 	last_name       VARCHAR(255) NULL,
 	email           VARCHAR(255) NOT NULL,
@@ -70,10 +71,10 @@ CREATE TABLE users
 	street_address1 VARCHAR(255) NULL,
 	street_address2 VARCHAR(255) NULL,
 	city            VARCHAR(255) NULL,
-	state           VARCHAR(50) NULL,
-	zip             VARCHAR(15) NULL,
+	state           VARCHAR(50)  NULL,
+	zip             VARCHAR(15)  NULL,
 	timezone        VARCHAR(50)  NOT NULL,
-	status          enum('new', 'action_taken', 'deactivated') DEFAULT 'new',
+	status          enum ('new', 'action_taken', 'deactivated') DEFAULT 'new',
 	created_at      DATETIME     NOT NULL,
 	updated_at      DATETIME     NOT NULL,
 	PRIMARY KEY (id),
@@ -83,21 +84,21 @@ CREATE TABLE users
 
 CREATE TABLE goals
 (
-	id          INT      NOT NULL AUTO_INCREMENT,
-	user_id     INT      NOT NULL,
-	parent_id   INT NULL,
-	category_id INT NULL,
-	name        TEXT     NOT NULL,
-	priority    INT      NOT NULL DEFAULT 99,
-	start_date  DATETIME NULL,
-	due_date    DATETIME NULL,
+	id          INT         NOT NULL AUTO_INCREMENT,
+	user_id     INT         NOT NULL,
+	parent_id   INT         NULL,
+	category_id INT         NULL,
+	name        TEXT        NOT NULL,
+	priority    INT         NOT NULL DEFAULT 99,
+	start_date  DATETIME    NULL,
+	due_date    DATETIME    NULL,
 	duration    VARCHAR(10) NULL,
-	details     TEXT NULL,
-	why         TEXT NULL,
-	result      TEXT NULL,
-	done        INT      NOT NULL DEFAULT 0,
-	created_at  DATETIME NOT NULL,
-	updated_at  DATETIME NOT NULL,
+	details     TEXT        NULL,
+	why         TEXT        NULL,
+	result      TEXT        NULL,
+	done        INT         NOT NULL DEFAULT 0,
+	created_at  DATETIME    NOT NULL,
+	updated_at  DATETIME    NOT NULL,
 	PRIMARY KEY (id),
 	FOREIGN KEY (user_id) REFERENCES users (id),
 	FOREIGN KEY (parent_id) REFERENCES goals (id) ON DELETE CASCADE,
@@ -117,10 +118,10 @@ CREATE TABLE skills
 CREATE TABLE courses
 (
 	id          INT      NOT NULL AUTO_INCREMENT,
-	skill_id    INT NULL,
+	skill_id    INT      NULL,
 	name        TEXT     NOT NULL,
-	link        TEXT NULL,
-	description TEXT NULL,
+	link        TEXT     NULL,
+	description TEXT     NULL,
 	total_time  INT      NOT NULL, /* minutes */
 	created_at  DATETIME NOT NULL,
 	updated_at  DATETIME NOT NULL,
@@ -134,8 +135,8 @@ CREATE TABLE lessons
 	course_id   INT      NOT NULL,
 	seq_num     INT      NOT NULL,
 	name        TEXT     NOT NULL,
-	link        TEXT NULL,
-	description TEXT NULL,
+	link        TEXT     NULL,
+	description TEXT     NULL,
 	duration    INT      NOT NULL, /* minutes */
 	created_at  DATETIME NOT NULL,
 	updated_at  DATETIME NOT NULL,
@@ -153,10 +154,10 @@ CREATE TABLE users_courses
 (
 	user_id     INT REFERENCES users (id),
 	course_id   INT REFERENCES courses (id),
-	status      ENUM('Requested', 'Scheduled', 'Started', 'Completed') DEFAULT 'Requested',
+	status      ENUM ('Requested', 'Scheduled', 'Started', 'Completed') DEFAULT 'Requested',
 	certificate VARCHAR(255) NULL,
-	created_at  DATETIME NOT NULL,
-	updated_at  DATETIME NOT NULL
+	created_at  DATETIME     NOT NULL,
+	updated_at  DATETIME     NOT NULL
 );
 
 CREATE TABLE users_lessons
@@ -164,26 +165,26 @@ CREATE TABLE users_lessons
 	user_id         INT REFERENCES users (id),
 	course_id       INT REFERENCES courses (id),
 	lesson_id       INT REFERENCES lessons (id),
-	status          ENUM('Requested', 'Scheduled', 'Started', 'Completed') DEFAULT 'Requested',
+	status          ENUM ('Requested', 'Scheduled', 'Started', 'Completed') DEFAULT 'Requested',
 	scheduled_start DATETIME NOT NULL,
 	scheduled_end   DATETIME NOT NULL,
-	final_comments  TEXT NULL,
+	final_comments  TEXT     NULL,
 	created_at      DATETIME NOT NULL,
 	updated_at      DATETIME NOT NULL
 );
 
 CREATE TABLE events
 (
-	id              INT          NOT NULL AUTO_INCREMENT,
-	user_id         INT          NOT NULL,
-	goal_id   INT NULL,
-	title           VARCHAR(255) NOT NULL,
-	description     TEXT NULL,
-	start_time      DATETIME     NOT NULL,
-	end_time        DATETIME     NOT NULL,
-	color           VARCHAR(255) DEFAULT '#6daa6d',
-	created_at      DATETIME     NOT NULL,
-	updated_at      DATETIME     NOT NULL,
+	id          INT          NOT NULL AUTO_INCREMENT,
+	user_id     INT          NOT NULL,
+	goal_id     INT          NULL,
+	title       VARCHAR(255) NOT NULL,
+	description TEXT         NULL,
+	start_time  DATETIME     NOT NULL,
+	end_time    DATETIME     NOT NULL,
+	color       VARCHAR(255) DEFAULT '#6daa6d',
+	created_at  DATETIME     NOT NULL,
+	updated_at  DATETIME     NOT NULL,
 	PRIMARY KEY (id),
 	FOREIGN KEY (user_id) REFERENCES users (id),
 	FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE
@@ -191,17 +192,41 @@ CREATE TABLE events
 
 CREATE TABLE conversation_history
 (
-	id          INT         NOT NULL AUTO_INCREMENT,
-	user_id     INT NULL,
-	session_id  VARCHAR(50) NULL,
-	type        VARCHAR(20) NOT NULL, -- "inquiry", "login", "logout", "change_screen", "register", "edit profile".
+	id          INT          NOT NULL AUTO_INCREMENT,
+	user_id     INT          NULL,
+	session_id  VARCHAR(50)  NULL,
+	type        VARCHAR(20)  NOT NULL, -- "inquiry", "login", "logout", "change_screen", "register", "edit profile".
 	question    VARCHAR(511) NULL,
 	response    VARCHAR(255) NULL,
-	ip_address  VARCHAR(30) NULL,
+	ip_address  VARCHAR(30)  NULL,
 	device_type VARCHAR(255) NULL,
-	timestamp   DATETIME    NOT NULL DEFAULT CURRENT_TIME(),
+	timestamp   DATETIME     NOT NULL DEFAULT CURRENT_TIME(),
 	PRIMARY KEY (id),
 	FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS `todos`
+(
+	`id`           INT          NOT NULL AUTO_INCREMENT,
+	`user_id`      INT          NOT NULL,
+	`parent_id`    INT          NULL,
+	`parent_table` VARCHAR(50)  NULL,
+	`category_id`  INT          NULL,
+	`name`         VARCHAR(255) NOT NULL,
+	`priority`     INT UNSIGNED NOT NULL,
+	`start_date`   DATETIME     NULL,
+	`due_date`     DATETIME     NULL,
+	`duration`     VARCHAR(10)  NULL,
+	`details`      TEXT         NULL,
+	`why`          VARCHAR(255) NULL,
+	`result`       TEXT         NULL,
+	`done`         TINYINT(1)   NOT NULL DEFAULT 0,
+	`created`      TIMESTAMP    NULL,
+	`updated`      TIMESTAMP    NULL,
+	PRIMARY KEY (`id`),
+	FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+	FOREIGN KEY (parent_id) REFERENCES todos (id) ON DELETE CASCADE,
+	FOREIGN KEY (category_id) REFERENCES categories (id)
 );
 
 INSERT INTO categories (id, name, created_at, updated_at)
@@ -335,14 +360,26 @@ INSERT INTO users (id, company_id, job_id, team_id, first_name, last_name, email
 values (110, 1, 1, 1, "Junling", "Hu", "junlinghu@gmail.com", "123456", "US/Pacific",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_access_token VARCHAR(255) null;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token VARCHAR(255) null;
-ALTER TABLE users CHANGE COLUMN `password` `password` VARCHAR(100) NULL;
+ALTER TABLE users
+	ADD COLUMN IF NOT EXISTS google_access_token VARCHAR(255) null;
+ALTER TABLE users
+	ADD COLUMN IF NOT EXISTS google_refresh_token VARCHAR(255) null;
+ALTER TABLE users
+	CHANGE COLUMN `password` `password` VARCHAR(100) NULL;
 
-ALTER TABLE `events` ADD COLUMN IF NOT EXISTS `source` VARCHAR(50) null;
-ALTER TABLE `events` ADD COLUMN IF NOT EXISTS `event_external_id` VARCHAR(80) null;
-ALTER TABLE `events` CHANGE COLUMN `title` `title` TEXT NULL;
-ALTER TABLE `events` CHANGE COLUMN `event_external_id` `event_external_id` VARCHAR(1025) NULL;
+ALTER TABLE users
+	ADD COLUMN IF NOT EXISTS profile_image VARCHAR(255) null;
+ALTER TABLE users
+	ADD COLUMN IF NOT EXISTS background INT null;
+
+ALTER TABLE `events`
+	ADD COLUMN IF NOT EXISTS `source` VARCHAR(50) null;
+ALTER TABLE `events`
+	ADD COLUMN IF NOT EXISTS `event_external_id` VARCHAR(80) null;
+ALTER TABLE `events`
+	CHANGE COLUMN `title` `title` TEXT NULL;
+ALTER TABLE `events`
+	CHANGE COLUMN `event_external_id` `event_external_id` VARCHAR(1025) NULL;
 
 INSERT INTO skills
 values (1, "Databases", 1, "2021-01-22", "2021-02-11 02:56");
@@ -494,12 +531,13 @@ INSERT INTO users_courses
 values (3, 4, "Scheduled", NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, start_date, name, priority, why, created_at, updated_at)
-values (1, 1, "2022-06-01", 'Prepare for concert in August', 1, "parents will be attending", "2022-05-20", "2022-05-21");
+values (1, 1, "2022-06-01", 'Prepare for concert in August', 1, "parents will be attending", "2022-05-20",
+		"2022-05-21");
 INSERT INTO goals (id, user_id, start_date, name, priority, why, created_at, updated_at)
 values (2, 1, "2022-06-01", 'Study for SATs', 2, "needed for college application", "2022-05-20", "2022-05-21");
 
 INSERT INTO goals (id, user_id, start_date, name, priority, created_at, updated_at)
-values (3, 2,"2022-06-01", 'Softball tournament', 1, "2022-05-20", "2022-05-21");
+values (3, 2, "2022-06-01", 'Softball tournament', 1, "2022-05-20", "2022-05-21");
 INSERT INTO goals (id, user_id, start_date, name, priority, why, created_at, updated_at)
 values (4, 2, "2022-06-01", 'Study for SATs', 2, "needed for college application", "2022-05-20", "2022-05-21");
 
@@ -514,7 +552,8 @@ INSERT INTO goals (id, user_id, start_date, name, priority, why, created_at, upd
 values (8, 4, "2022-06-01", 'Prepare college app materials', 2, "Go to college", "2022-05-20", "2022-05-21");
 
 INSERT INTO goals (id, user_id, start_date, name, priority, why, created_at, updated_at)
-values (9, 1, "2022-07-01", 'Prepare for concert in August', 1, "parents will be attending", "2022-05-20", "2022-05-21");
+values (9, 1, "2022-07-01", 'Prepare for concert in August', 1, "parents will be attending", "2022-05-20",
+		"2022-05-21");
 INSERT INTO goals (id, user_id, start_date, name, priority, why, created_at, updated_at)
 values (10, 1, "2022-07-01", 'Study for SATs', 2, "needed for college application", "2022-05-20", "2022-05-21");
 
@@ -535,118 +574,119 @@ values (16, 4, "2022-07-01", 'Prepare college app materials', 2, "Go to college"
 
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (21, 1, 1, "2022-06-20", "Music practice session", 3, ADDTIME(CURRENT_DATE(), "7 0:00:00"), "8 hours", null,
 		"Violin concerto",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (22, 1, 2, "2022-06-20", "Read SAT book, chapter 1", 1, ADDTIME(CURRENT_DATE(), "5 0:00:00"),
 		"4 hours", "Book was given to me by advisor",
 		"Keep up to date", CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (23, 2, 3, "2022-06-20", "softball practice", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "12 hours", null, "",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (24, 2, 4, "2022-06-20", "Read SAT book, chapter 1", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "12 hours", null,
 		"",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (25, 3, 5, "2022-06-20", "Buy the book for Hamlet", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "5 hours", null, "",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (26, 3, 6, "2022-06-20", "Walking time", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "5 hours", null, "",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (27, 4, 7, "2022-06-20", "buy art supplies", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "5 hours", null, "",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
-values (28, 4, 8, "2022-06-20", "Read SAT book, chapter 2", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "5 hours", null, "",
+				   created_at, updated_at)
+values (28, 4, 8, "2022-06-20", "Read SAT book, chapter 2", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "5 hours", null,
+		"",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (29, 1, 1, "2022-06-27", "Music practice session", 3, ADDTIME(CURRENT_DATE(), "7 0:00:00"), "8 hours", null,
 		"Violin concerto",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (30, 1, 2, "2022-06-27", "Read SAT book, chapter 1", 1, ADDTIME(CURRENT_DATE(), "5 0:00:00"),
 		"4 hours", "Book was given to me by advisor",
 		"Keep up to date", CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (31, 2, 3, "2022-06-27", "softball practice", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "12 hours", null, "",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (32, 2, 4, "2022-06-27", "Read SAT book, chapter 1", 2, ADDTIME(CURRENT_DATE(), "4 0:00:00"), "12 hours", null,
 		"",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (33, 1, 9, "2022-07-04", "Music practice session", 3, ADDTIME(CURRENT_DATE(), "7 0:00:00"), "8 hours", null,
 		"Violin concerto",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (34, 1, 10, "2022-07-04", "Read SAT book, chapter 1", 1, ADDTIME(CURRENT_DATE(), "5 0:00:00"),
 		"4 hours", "Book was given to me by advisor",
 		"Keep up to date", CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (35, 1, 9, "2022-07-11", "Music practice session", 3, ADDTIME(CURRENT_DATE(), "7 0:00:00"), "8 hours", null,
 		"Violin concerto",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, due_date, duration, details, why,
-						  created_at, updated_at)
+				   created_at, updated_at)
 values (36, 1, 10, "2022-07-11", "Read SAT book, chapter 1", 1, ADDTIME(CURRENT_DATE(), "5 0:00:00"),
 		"4 hours", "Book was given to me by advisor",
 		"Keep up to date", CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, created_at,
-						 updated_at)
+				   updated_at)
 values (51, 1, 1, "2022-06-26", "Music practice", 1, 6, "Music practice", "Music practice",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, created_at,
-						 updated_at)
+				   updated_at)
 values (52, 1, 2, "2022-06-26", "study time", 2, 3, null, "study time", CURRENT_TIMESTAMP(),
 		CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, done, created_at,
-						 updated_at)
+				   updated_at)
 values (53, 2, 3, "2022-06-26", "softball time", 1, 5, null, "", 0,
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, done, created_at,
-						 updated_at)
+				   updated_at)
 values (54, 3, 4, "2022-06-26", "Study the material", 1, 5, null, "", 0,
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, created_at,
-						 updated_at)
+				   updated_at)
 values (55, 4, 9, "2022-07-04", "Music practice", 1, 6, "Music practice", "Music practice",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, created_at,
-						 updated_at)
+				   updated_at)
 values (56, 5, 10, "2022-07-04", "study time", 2, 3, null, "study time", CURRENT_TIMESTAMP(),
 		CURRENT_TIMESTAMP());
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, created_at,
-						 updated_at)
+				   updated_at)
 values (57, 6, 9, "2022-07-12", "Music practice", 1, 6, "Music practice", "Music practice",
 		CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 INSERT INTO goals (id, user_id, parent_id, start_date, name, priority, duration, details, why, created_at,
-						 updated_at)
+				   updated_at)
 values (58, 7, 10, "2022-07-12", "study time", 2, 3, null, "study time", CURRENT_TIMESTAMP(),
 		CURRENT_TIMESTAMP());
