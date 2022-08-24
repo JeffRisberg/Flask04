@@ -1,6 +1,6 @@
 from .util import *
 from .database.db_user import *
-from .database.db_tasks import *
+from .database.db_goals import *
 
 def add_task1(coach, userIn):
 	# print("begin add_tasks3")

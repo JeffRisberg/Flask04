@@ -8,10 +8,7 @@ from src import engine, metadata
 
 categories = metadata.tables['categories']
 users = metadata.tables['users']
-top_goals = metadata.tables['top_goals']
-monthly_goals = metadata.tables['monthly_goals']
-daily_tasks = metadata.tables['daily_tasks']
-weekly_tasks = metadata.tables['weekly_tasks']
+goals = metadata.tables['goals']
 events = metadata.tables['events']
 
 
@@ -54,61 +51,7 @@ def get_categories():
 		return results
 
 
-def update_top_goal(content):
-	with engine.connect() as conn:
-		stmt = update(top_goals).where(top_goals.c.id == content['id']).values(**content)
-		conn.execute(stmt)
-
-		results = {}
-		return results
-
-
-def get_top_goals(user_id, request):
-	with engine.connect() as conn:
-		done = request.args.get('done')
-
-		stmt = select([top_goals]).filter(top_goals.c.user_id == user_id)
-		if done != None:
-			stmt = stmt.filter(top_goals.c.done == done)
-
-		stmt = stmt.order_by(top_goals.c.priority)
-		query = conn.execute(stmt)
-		resultSet = query.fetchall()
-		results = [{'id': t['id'], 'category_id': t['category_id'], 'name': t['name'], 'why': t['why'],
-					'priority': t['priority'], 'duration': t['duration'], 'start_date': t['start_date'],
-					'due_date': t['due_date'], 'done': t['done']}
-				   for t in resultSet]
-		return results
-
-
-def get_monthly_goals(user_id, request):
-	with engine.connect() as conn:
-		done = request.args.get('done')
-
-		# using today's month
-		timezone = 'US/Pacific'  # update with user time zone
-		date = get_localDate(timezone)
-		year, month = get_year_month(date)
-		firstDay_month = datetime.datetime(year, month, 1)
-		stmt = select([monthly_goals]).filter(
-			and_(monthly_goals.c.user_id == user_id, monthly_goals.c.firstDay_month == str(firstDay_month)))
-		if done != None:
-			stmt = stmt.filter(monthly_goals.c.done == done)
-
-		stmt = stmt.order_by(monthly_goals.c.priority)
-		query = conn.execute(stmt)
-		resultSet = query.fetchall()
-		results = [{'id': t['id'], 'name': t['name'], 'why': t['why'],
-					'firstDay_month': t['firstDay_month'],
-					'priority': t['priority'], 'duration': t['duration'], 'start_date': t['start_date'],
-					'due_date': t['due_date'], 'done': t['done'],
-					'start': (t['firstDay_month'] - datetime.timedelta(days=0)).isoformat(),
-					'end': (t['firstDay_month'] - datetime.timedelta(days=0)).isoformat()}
-				   for t in resultSet]
-		return results
-
-
-def get_weekly_tasks(user_id, request):
+def get_goals(user_id, request):
 	with engine.connect() as conn:
 		done = request.args.get('done')
 		all = request.args.get('all')
@@ -118,14 +61,14 @@ def get_weekly_tasks(user_id, request):
 		timezone = 'US/Pacific'  # update with user time zone
 		monday = this_Monday(timezone)
 		date = str(monday)
-		stmt = select([weekly_tasks]).filter(weekly_tasks.c.user_id == user_id)
+		stmt = select([weekly_tasks]).filter(goals.c.user_id == user_id)
 
 		if all == None and parent_ids == None:
-			stmt = stmt.filter(weekly_tasks.c.Monday == date)
+			stmt = stmt.filter(goals.c.Monday == date)
 		if done != None:
-			stmt = stmt.filter(weekly_tasks.c.done == done)
+			stmt = stmt.filter(goals.c.done == done)
 		if parent_ids != None:
-			stmt = stmt.filter(weekly_tasks.c.parent_id.in_(parent_ids.split(",")))
+			stmt = stmt.filter(goals.c.parent_id.in_(parent_ids.split(",")))
 
 		stmt = stmt.order_by(weekly_tasks.c.priority)
 		query = conn.execute(stmt)
@@ -179,40 +122,6 @@ def get_daily_tasks(user_id, request):
 					'end': (t['start_time'] + datetime.timedelta(hours=1)).isoformat()}
 				   for t in r]
 		return results
-
-
-def get_tasks_daily_summary(user_id, request):
-	with engine.connect() as conn:
-		timezoneU = 'US/Pacific'
-		local_date = get_localDate(timezoneU)
-
-		stmt = select([daily_tasks]).filter(
-			and_(daily_tasks.c.user_id == user_id, daily_tasks.c.date_local < local_date))
-
-		query = conn.execute(stmt)
-		resultSet = query.fetchall()
-		results = [{'id': t['id'], 'name': t['name'], 'date': t['date_local'], 'why': t['why'],
-					'priority': t['priority'], 'done': t['done'], 'type': 'Daily'}
-				   for t in resultSet]
-
-		return sorted(results, key=lambda item: (item['date'], -item['priority']), reverse=True)
-
-
-def get_tasks_weekly_summary(user_id, request):
-	with engine.connect() as conn:
-		monday = this_Monday()
-		Monday = str(monday)
-
-		stmt = select([weekly_tasks]).filter(
-			and_(weekly_tasks.c.user_id == user_id, weekly_tasks.c.Mondayof_week < Monday))
-
-		query = conn.execute(stmt)
-		resultSet = query.fetchall()
-		results = [{'id': t['id'], 'name': t['name'], 'date': t['Mondayof_week'], 'why': t['why'],
-					'priority': t['priority'], 'done': t['done'], 'type': 'Weekly'}
-				   for t in resultSet]
-
-		return sorted(results, key=lambda item: (item['date'], -item['priority']), reverse=True)
 
 
 def update_task(content):
