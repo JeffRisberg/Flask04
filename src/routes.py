@@ -1,4 +1,5 @@
 import datetime
+import os.path
 
 from pytz import timezone
 from typing import List, Union
@@ -15,6 +16,7 @@ from sendgrid import Mail
 from sendgrid.helpers import mail
 from ua_parser import user_agent_parser
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 
 from src import mail as mail_service
 
@@ -23,7 +25,7 @@ from .coach import Coach
 from .coach_state import stateResponse
 
 from .google import get_google_token, get_google_profile, get_google_credential, get_google_calendar_events, \
-	get_google_calendar_color, add_google_calendar_event
+	get_google_calendar_color, add_google_calendar_event, get_google_calendar_event_colors, update_google_calendar_event
 from .template.email import get_password_reset_email_template
 
 
@@ -35,9 +37,17 @@ def log_request(request, user_id, type, question, response):
 	device_type = str(device_type['family'] or '') + ":" + str(device_type['brand'] or '') + ":" + \
 				  str(device_type['model'] or '') + ":" + str(user_agent['family'] or '')
 	session_id = request.cookies.get('session')
-	database.save_conversation({'user_id': user_id, 'session_id': session_id,
-								'type': type, 'question': question, 'response': response,
-								'ip_address': ip_address, 'device_type': device_type})
+	database.save_conversation(
+		{
+			'user_id': user_id,
+			'session_id': session_id,
+			'type': type,
+			'question': question,
+			'response': response,
+			'ip_address': ip_address,
+			'device_type': device_type,
+		}
+	)
 
 
 def create_email(
@@ -65,6 +75,81 @@ def create_email(
 	)
 	return message
 
+
+def _sync_google_event(credentials, user_id):
+	source = 'google'
+	try:
+		user = database.get_user_by_id(user_id)
+		today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+		start_date = today - datetime.timedelta(hours=9)
+		end_date = today + datetime.timedelta(days=30, hours=9)
+
+		results = get_google_calendar_events(credentials, start_date, end_date)
+		event_colors = get_google_calendar_event_colors(credentials)
+
+		checked_events = []
+
+		for result in results:
+			event_external_id = result["id"]
+			start = result['start']
+			end = result['end']
+
+			start_time = None
+			end_time = None
+			if start.get('dateTime', None) != None:
+				start_time = datetime.datetime.strptime(start["dateTime"], "%Y-%m-%dT%H:%M:%S%z").astimezone(
+					timezone("UTC")
+				)
+				end_time = datetime.datetime.strptime(end["dateTime"], "%Y-%m-%dT%H:%M:%S%z").astimezone(
+					timezone("UTC")
+				)
+			if start.get('date', None) != None:
+				start_time = datetime.datetime.strptime(start["date"], "%Y-%m-%d")
+				end_time = datetime.datetime.strptime(end["date"], "%Y-%m-%d")
+
+			if start_time == None or end_time == None:
+				continue
+
+			if "summary" in result:
+				title = result["summary"]
+			else:
+				title = '(No Title)'
+
+			if "colorId" in result and result["colorId"] in event_colors:
+				color = event_colors[result["colorId"]]
+			else:
+				color = "#4285f4"
+
+			event = {
+				"user_id": user[0]["id"],
+				"title": title,
+				"start_time": start_time,
+				"end_time": end_time,
+				"color": color,
+				"source": source,
+				"event_external_id": result["id"],
+			}
+
+			checked_events.append(result["id"])
+
+			events = database.get_event_by_external_id(event_external_id)
+
+			if len(events) == 0:
+				database.add_event(event)
+
+			if len(events) > 0 and (
+				event['title'] != events[0]['title'] or
+				event['start_time'].timestamp() != events[0]['start_time'].timestamp() or
+				event['end_time'].timestamp() != events[0]['end_time'].timestamp() or
+				event['color'] != events[0]['color']
+			):
+				database.delete_event_by_external_id(event_external_id)
+				database.add_event(event)
+
+		database.remove_unchecked_events(user_id, checked_events, start_date, end_date, source)
+
+	except BaseException as err:
+		print(f"Unexpected {err=}, {type(err)=}")
 
 @current_app.route('/inquiry', methods=['POST'])
 @cross_origin()
@@ -260,7 +345,14 @@ def api_events(user_id):
 		if "token" in session:
 			credentials = session['token']
 
-			add_google_calendar_event(credentials, event["title"], start_time, end_time)
+			event_external_id = add_google_calendar_event(credentials, event["title"], start_time, end_time)
+
+			event_data = {
+				"id": event_id,
+				"event_external_id": event_external_id
+			}
+
+			database.update_event(event_data)
 
 		return jsonify({
 			"event_id": event_id
@@ -270,7 +362,25 @@ def api_events(user_id):
 @current_app.route("/api/events", methods=['PATCH'])
 def api_update_event():
 	content = request.json
+	if "start" in content:
+		content["start_time"] = dt.parse(content["start"])
+		content.pop("start")
+	if "end" in content:
+		content["end_time"] = dt.parse(content["end"])
+		content.pop("end")
 	database.update_event(content)
+
+	event = database.get_event_by_id(content["id"])[0]
+	if event['event_external_id'] and "token" in session:
+		credentials = session['token']
+		update_google_calendar_event(
+			credentials,
+			event['event_external_id'],
+			event["title"],
+			event["start_time"],
+			event["end_time"],
+		)
+
 	return jsonify({
 		"event_id": content["id"]
 	})
@@ -318,19 +428,27 @@ def api_set_goal():
 	task = database.get_task(user_id, date, priority, table)
 
 	if task and len(task) > 0:
-		result = database.update_task({
+		update_content = {
 			"id": task[0]['id'],
-			"table": content["table"],
-			"name": content["name"]
-		})
+			"table": content["table"]
+		}
+
+		if "name" in content:
+			update_content["name"] = content["name"]
+		if "done" in content:
+			update_content["done"] = content["done"]
+		result = database.update_task(update_content)
 	else:
-		result = database.add_task(
+		task_id = database.add_task(
 			user_id,
 			content["name"],
 			priority,
 			table,
 			content['date'],
 		)
+		result = {
+			"task_id": task_id
+		}
 
 	return jsonify(result)
 
@@ -393,77 +511,37 @@ def login():
 		try:
 			credentials = session['token']
 
-			today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-			start_date = today - datetime.timedelta(hours=9)
-			end_date = today + datetime.timedelta(days=30, hours=9)
-
-			results = get_google_calendar_events(credentials, start_date, end_date)
-
-			checked_events = []
-
-			for result in results:
-				event_external_id = result["id"]
-				start = result['start']
-				end = result['end']
-
-				start_time = None
-				end_time = None
-				if start.get('dateTime', None) != None:
-					start_time = datetime.datetime.strptime(start["dateTime"], "%Y-%m-%dT%H:%M:%S%z").astimezone(
-						timezone("UTC")
-					)
-					end_time = datetime.datetime.strptime(end["dateTime"], "%Y-%m-%dT%H:%M:%S%z").astimezone(
-						timezone("UTC")
-					)
-				if start.get('date', None) != None:
-					start_time = datetime.datetime.strptime(start["date"], "%Y-%m-%d")
-					end_time = datetime.datetime.strptime(end["date"], "%Y-%m-%d")
-
-				if start_time == None or end_time == None:
-					continue
-
-				if "summary" in result:
-					title = result["summary"]
-				else:
-					title = '(No Title)'
-
-				if "colorId" in result:
-					color = get_google_calendar_color(credentials, result["colorId"])
-				else:
-					color = "#4285f4"
-
-				event = {
-					"user_id": user[0]["id"],
-					"title": title,
-					"start_time": start_time,
-					"end_time": end_time,
-					"color": color,
-					"source": source,
-					"event_external_id": result["id"],
-				}
-
-				checked_events.append(result["id"])
-
-				events = database.get_event_by_external_id(event_external_id)
-
-				if len(events) == 0:
-					database.add_event(event)
-
-				if len(events) > 0 and (
-					event['title'] != events[0]['title'] or
-					event['start_time'].timestamp() != events[0]['start_time'].timestamp() or
-					event['end_time'].timestamp() != events[0]['end_time'].timestamp() or
-					event['color'] != events[0]['color']
-				):
-					database.delete_event_by_external_id(event_external_id)
-					database.add_event(event)
-
-			database.remove_unchecked_events(user_id, checked_events, start_date, end_date, source)
+			_sync_google_event(credentials, user_id)
 		except BaseException as err:
 			print(f"Unexpected {err=}, {type(err)=}")
 
 	response = user
 	return jsonify(response)
+
+
+@current_app.route("/api/profile", methods=['GET', 'POST'])
+def get_user():
+	if request.method == 'GET':
+		if "user_id" in session:
+			user_id = session['user_id']
+			user = database.get_user_by_id(user_id)
+			return jsonify(user)
+		else:
+			return jsonify(None)
+	else:
+		content = request.form.to_dict()
+		content["id"] = session['user_id']
+
+		if "avatar" in request.files:
+			avatar = request.files["avatar"]
+			file_name = secure_filename(avatar.filename)
+			avatar.save(os.path.join("upload/avatars", file_name))
+			content["profile_image"] = f'/avatar/{file_name}'
+
+		database.update_user(content)
+		user = database.get_user_by_id(session['user_id'])
+
+		return jsonify(user)
 
 
 @current_app.route("/api/goals/<int:user_id>", methods=['GET'])
@@ -474,11 +552,21 @@ def get_goals(user_id):
 
 	goals = database.get_set_goal_tasks(user_id, goal_type, current_date)
 
-	return jsonify([{"name": goal['name'], "priority": goal["priority"]} for goal in goals])
+	return jsonify([
+		{
+			"id": goal['id'],
+			"name": goal['name'],
+			"priority": goal["priority"],
+			"done": goal["done"]
+		} for goal in goals
+	])
 
 
 @current_app.route("/logout", methods=['POST'])
 def logout():
+	session.pop("user_id", None)
+	session.pop("token", None)
+
 	if session.get('coach'):
 		coach = session['coach']
 		log_request(request, coach.user_id, 'logout', '', '')
@@ -598,21 +686,23 @@ def images(name):
 	return send_from_directory("../static/images", name)
 
 
+@current_app.route("/avatar/<string:name>")
+def avatars(name):
+	return send_from_directory("../upload/avatars", name)
+
+
 @current_app.route("/api/todos/<int:user_id>", methods=['GET', 'POST', 'PATCH'])
 def api_todos(user_id):
 	if request.method == 'GET':
-		content = request.args
-		start = parse(content.get("start"))
-		end = parse(content.get("end"))
-
-		todos = database.get_todos(user_id, start, end)
+		todos = database.get_todos(user_id)
 
 		return jsonify(todos)
 
 	elif request.method == 'POST':
 		content = request.json
 		content["user_id"] = user_id
-		content["start_date"] = parse(content["start_date"])
+		content["start_date"] = dt.parse(content["start_date"])
+		content["priority"] = 100
 		todo = database.add_todo(content)
 
 		return jsonify(todo)
@@ -628,7 +718,6 @@ def api_todos(user_id):
 @current_app.route("/api/todos/<int:todo_id>", methods=['DELETE'])
 def api_delete_todos(todo_id):
 	response = database.remove_todo(todo_id)
-
 	return jsonify(response)
 
 
@@ -646,3 +735,54 @@ def api_update_todo_priorities(user_id):
 
 	return jsonify("success")
 
+
+@current_app.route("/api/updateTodos", methods=['POST'])
+def api_update_todo():
+	content = request.json
+	user_id = session['user_id']
+	for item in content:
+		try:
+			if "id" in item:
+				update_data = {
+					"id": item["id"],
+					"name": item["name"],
+					"priority": item["priority"],
+					"parent_id": item["parent_id"],
+					"done": item["done"],
+					"start_date": dt.parse(item["start_date"]),
+					"user_id": user_id,
+				}
+
+				database.update_todo(update_data)
+			else:
+				create_data = {
+					"name": item["name"],
+					"priority": item["priority"],
+					"parent_id": item["parent_id"],
+					"start_date": datetime.datetime.utcnow(),
+					"user_id": user_id,
+					"done": item["done"],
+				}
+
+				database.add_todo(create_data)
+		except Exception as e:
+			print(e)
+
+	return jsonify("success")
+
+
+@current_app.route("/api/refresh_event", methods=["GET"])
+def resync_events():
+	if "token" not in session:
+		return jsonify("success")
+
+	try:
+		user_id = session['user_id']
+		credentials = session['token']
+		if credentials.expired:
+			credentials.refresh()
+		session['token'] = credentials
+		_sync_google_event(credentials=credentials, user_id=user_id)
+	except BaseException as err:
+		print(f"Unexpected {err=}, {type(err)=}")
+	return jsonify("success")
